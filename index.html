@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Passport Photo Maker - Printable 8 Photos on 6x4 Page with 30px Gaps</title>
+<title>Passport Photo Maker - Fixed Size Photos Layout Vertical</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
@@ -37,6 +37,9 @@
   }
   .upload-section {
     margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
   label.upload-label {
     display: inline-flex;
@@ -49,12 +52,21 @@
     font-weight: 600;
     transition: background-color 0.3s ease;
     user-select: none;
+    max-width: fit-content;
   }
   label.upload-label:hover {
     background: #4338ca;
   }
   input[type="file"] {
     display: none;
+  }
+  select#photo-count {
+    max-width: 160px;
+    font-size: 1rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    cursor: pointer;
   }
   .canvas-container {
     position: relative;
@@ -71,6 +83,7 @@
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     background: white;
+    image-rendering: crisp-edges;
   }
   .btn-group {
     margin-top: 1.5rem;
@@ -107,19 +120,29 @@
 </head>
 <body>
   <header>
-    Passport Photo Maker - 8 Photos on 6×4 inch page with 30px Gaps
+    Passport Photo Maker - Fixed Size Photos Layout Vertical
   </header>
   <main>
-    <section class="upload-section">
+    <section class="upload-section" aria-label="Upload image and select photo count">
+      <label for="photo-count">Select number of photos:</label>
+      <select id="photo-count" aria-label="Select number of photos to place on page">
+        <option value="2">2 Photos</option>
+        <option value="4">4 Photos</option>
+        <option value="8" selected>8 Photos</option>
+      </select>
+
       <label htmlFor="upload" class="upload-label" aria-label="Upload image to create passport photos">
         <span class="material-icons" aria-hidden="true">upload_file</span>
         Upload Image
         <input type="file" id="upload" accept="image/*" />
       </label>
-      <p class="note">Upload a photo to crop to passport size. The app places 8 photos (1.5×2 inch approx.) with 3px black border and 30px white gaps around each photo on a 6×4 inch page (landscape) for printing and cutting.</p>
+
+      <p class="note">
+        Upload a photo to crop to passport size. The app places the selected number of photos with 3px black border and 30px white gaps around each photo on a 6×4 inch page (landscape). Photos keep the same size regardless of count; empty space remains blank. Photos are stacked vertically in 1 column.
+      </p>
     </section>
     <section class="canvas-container" aria-label="Passport photo preview and download area">
-      <canvas id="photo-canvas" width="1800" height="1200" aria-label="Generated 6 by 4 inch page with 8 passport photos"></canvas>
+      <canvas id="photo-canvas" width="1800" height="1200" aria-label="Generated 6 by 4 inch page with passport photos"></canvas>
     </section>
     <div class="btn-group" role="group" aria-label="Download options">
       <button id="download-png" class="download-btn" disabled aria-disabled="true" aria-label="Download image as PNG">
@@ -140,58 +163,38 @@
 
       const pageWidthPx = Math.round(pageWidthInch * DPI); // 1800
       const pageHeightPx = Math.round(pageHeightInch * DPI); // 1200
-      
+
       const borderPx = 3; // black border thickness (inside photo)
+      const gapPx = 30;   // gap around each photo
 
-      // Gap of 30px
-      const gapPx = 40;
+      // Fixed photo box size assuming 4 col × 2 rows layout for 8 photos (max)
+      const layoutCols = 4;
+      const layoutRows = 2;
 
-      // Grid config: 4 columns × 2 rows
-      const cols = 4;
-      const rows = 2;
+      const totalGapX = (layoutCols + 1) * gapPx;
+      const totalGapY = (layoutRows + 1) * gapPx;
 
-      // Total gaps horizontal and vertical (cols+1 and rows+1 gaps)
-      const totalGapX = (cols + 1) * gapPx;
-      const totalGapY = (rows + 1) * gapPx;
+      const photoBoxWidth = (pageWidthPx - totalGapX) / layoutCols;
+      const photoBoxHeight = (pageHeightPx - totalGapY) / layoutRows;
 
-      // Photo box width and height including border (excluding gap)
-      const photoBoxWidth = (pageWidthPx - totalGapX) / cols;
-      const photoBoxHeight = (pageHeightPx - totalGapY) / rows;
-
-      // Image size inside border
       const imageWidth = photoBoxWidth - 2 * borderPx;
       const imageHeight = photoBoxHeight - 2 * borderPx;
 
-      const targetAspect = imageWidth / imageHeight; // aspect ratio for cropping
+      const targetAspect = imageWidth / imageHeight;
+
+      let photosCount = 8; // default selected photo count
 
       const canvas = document.getElementById('photo-canvas');
       const ctx = canvas.getContext('2d');
+
+      let uploadedImage = null;
 
       function clearCanvas() {
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, pageWidthPx, pageHeightPx);
       }
 
-      function drawPhotoWithBorderAndGap(img, sx, sy, sWidth, sHeight, dx, dy, boxWidth, boxHeight) {
-        // dx, dy include gapPx left and top for the photo box
-        const borderX = dx + gapPx;
-        const borderY = dy + gapPx;
-        const borderWidth = boxWidth;
-        const borderHeight = boxHeight;
-
-        // Draw black border rect (photo box)
-        ctx.fillStyle = 'black';
-        ctx.fillRect(borderX, borderY, borderWidth, borderHeight);
-
-        // Draw image inside border adjusted by border thickness
-        ctx.drawImage(img, sx, sy, sWidth, sHeight,
-          borderX + borderPx,
-          borderY + borderPx,
-          borderWidth - 2 * borderPx,
-          borderHeight - 2 * borderPx);
-      }
-
-      function createCropArea(image) {
+      function createCropArea(image, targetAspect) {
         const imgAspect = image.width / image.height;
         let sx, sy, sWidth, sHeight;
 
@@ -209,27 +212,61 @@
         return { sx, sy, sWidth, sHeight };
       }
 
-      function drawAllPhotos(img) {
+      function drawPhotoWithBorderAndGap(img, sx, sy, sWidth, sHeight, dx, dy, boxWidth, boxHeight) {
+        const borderX = dx + gapPx;
+        const borderY = dy + gapPx;
+        const borderWidth = boxWidth;
+        const borderHeight = boxHeight;
+
+        ctx.fillStyle = 'black';
+        ctx.fillRect(borderX, borderY, borderWidth, borderHeight);
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight,
+          borderX + borderPx,
+          borderY + borderPx,
+          borderWidth - 2 * borderPx,
+          borderHeight - 2 * borderPx);
+      }
+
+      // Draw photos stacked vertically in 1 column, fixed photo size
+      function drawAllPhotosVertical(img, count) {
         clearCanvas();
 
-        const crop = createCropArea(img);
+        const crop = createCropArea(img, targetAspect);
 
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const dx = c * (photoBoxWidth + gapPx);
-            const dy = r * (photoBoxHeight + gapPx);
+        for (let i = 0; i < count; i++) {
+          const dx = 0; // fixed 0 for 1 column
+          const dy = i * (photoBoxHeight + gapPx);
 
-            drawPhotoWithBorderAndGap(
-              img,
-              crop.sx,
-              crop.sy,
-              crop.sWidth,
-              crop.sHeight,
-              dx,
-              dy,
-              photoBoxWidth,
-              photoBoxHeight
-            );
+          drawPhotoWithBorderAndGap(img, crop.sx, crop.sy, crop.sWidth, crop.sHeight, dx, dy, photoBoxWidth, photoBoxHeight);
+        }
+      }
+
+      // To keep rest blank for 2 and 4 photos, and 8 photos arrange in 4x2 grid
+      function drawAllPhotos(img, count) {
+        if (count === 2) {
+          drawAllPhotosVertical(img, count);
+        } else if (count === 4) {
+          // arrange 2x2 grid top-left corner with fixed photo size and gaps
+          clearCanvas();
+          const crop = createCropArea(img, targetAspect);
+          for (let i = 0; i < count; i++) {
+            const row = Math.floor(i / 2);
+            const col = i % 2;
+            const dx = col * (photoBoxWidth + gapPx);
+            const dy = row * (photoBoxHeight + gapPx);
+            drawPhotoWithBorderAndGap(img, crop.sx, crop.sy, crop.sWidth, crop.sHeight, dx, dy, photoBoxWidth, photoBoxHeight);
+          }
+        } else {
+          // 8 photos in 4x2 grid filling top-left with fixed sizes
+          clearCanvas();
+          const crop = createCropArea(img, targetAspect);
+          for (let i = 0; i < count; i++) {
+            const row = Math.floor(i / layoutCols);
+            const col = i % layoutCols;
+            const dx = col * (photoBoxWidth + gapPx);
+            const dy = row * (photoBoxHeight + gapPx);
+            drawPhotoWithBorderAndGap(img, crop.sx, crop.sy, crop.sWidth, crop.sHeight, dx, dy, photoBoxWidth, photoBoxHeight);
           }
         }
       }
@@ -244,7 +281,7 @@
 
         const link = document.createElement('a');
         link.href = dataUrl;
-        link.download = `passport_photos.${format}`;
+        link.download = `passport_photos_${photosCount}.${format}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -253,8 +290,7 @@
       const uploadInput = document.getElementById('upload');
       const btnDownloadPNG = document.getElementById('download-png');
       const btnDownloadJPG = document.getElementById('download-jpg');
-
-      let uploadedImage = null;
+      const photoCountSelect = document.getElementById('photo-count');
 
       uploadInput.addEventListener('change', e => {
         const file = e.target.files[0];
@@ -264,12 +300,11 @@
           alert('Please upload a valid image file.');
           return;
         }
-        
         const img = new Image();
         const url = URL.createObjectURL(file);
         img.onload = () => {
           uploadedImage = img;
-          drawAllPhotos(img);
+          drawAllPhotos(uploadedImage, photosCount);
           btnDownloadPNG.disabled = false;
           btnDownloadJPG.disabled = false;
           btnDownloadPNG.setAttribute('aria-disabled', 'false');
@@ -289,11 +324,19 @@
         img.src = url;
       });
 
+      photoCountSelect.addEventListener('change', e => {
+        photosCount = parseInt(e.target.value, 10);
+        if(uploadedImage) {
+          drawAllPhotos(uploadedImage, photosCount);
+        }
+      });
+
       btnDownloadPNG.addEventListener('click', () => {
         if(uploadedImage) {
           downloadCanvas('png');
         }
       });
+
       btnDownloadJPG.addEventListener('click', () => {
         if(uploadedImage) {
           downloadCanvas('jpg');

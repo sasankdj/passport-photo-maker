@@ -120,9 +120,12 @@
 </head>
 <body>
   <header>
-    Passport Photo Maker - Fixed Size Photos Layout Vertical
+    Passport Photo Maker by sasank
   </header>
   <main>
+    <section>
+      <button id="remove-bg">click here to remove background</button>
+    </section>
     <section class="upload-section" aria-label="Upload image and select photo count">
       <label for="photo-count">Select number of photos:</label>
       <select id="photo-count" aria-label="Select number of photos to place on page">
@@ -137,9 +140,7 @@
         <input type="file" id="upload" accept="image/*" />
       </label>
 
-      <p class="note">
-        Upload a photo to crop to passport size. The app places the selected number of photos with 3px black border and 30px white gaps around each photo on a 6×4 inch page (landscape). Photos keep the same size regardless of count; empty space remains blank. Photos are stacked vertically in 1 column.
-      </p>
+      
     </section>
     <section class="canvas-container" aria-label="Passport photo preview and download area">
       <canvas id="photo-canvas" width="1800" height="1200" aria-label="Generated 6 by 4 inch page with passport photos"></canvas>
@@ -291,6 +292,7 @@
       const btnDownloadPNG = document.getElementById('download-png');
       const btnDownloadJPG = document.getElementById('download-jpg');
       const photoCountSelect = document.getElementById('photo-count');
+      const removebg=document.getElementById("remove-bg")
 
       uploadInput.addEventListener('change', e => {
         const file = e.target.files[0];
@@ -342,6 +344,10 @@
           downloadCanvas('jpg');
         }
       });
+      removebg.addEventListener('click', () => {
+  window.location.href = 'https://www.adobe.com/express/feature/image/remove-background';
+});
+
 
       clearCanvas();
     })();

@@ -386,6 +386,7 @@
             <!-- In the script section, replace the initializeCropper function with this: -->
 
 
+
             function initializeCropper() {
                 if (cropper) {
                     cropper.destroy();
@@ -438,7 +439,37 @@
 
 
 
-           
+
+            // Apply crop
+            applyCropBtn.addEventListener('click', function () {
+
+
+                if (!cropper) return;
+
+                // Get the cropped canvas
+                const croppedCanvas = cropper.getCroppedCanvas();
+
+                if (!croppedCanvas) {
+                    alert('Please select a crop area first.');
+                    return;
+                }
+
+                // Update the result canvas with the cropped image
+                resultCanvas.width = croppedCanvas.width;
+                resultCanvas.height = croppedCanvas.height;
+                ctx.drawImage(croppedCanvas, 0, 0);
+
+                // Also update the uploadedImage reference for future edits
+                const newImage = new Image();
+                newImage.onload = function () {
+                    uploadedImage = newImage;
+                };
+                newImage.src = croppedCanvas.toDataURL('image/png');
+
+                // Switch back to color tab
+                document.querySelector('.tab-button[data-tab="color"]').click();
+            });
+
 
             // Cancel crop
             cancelCropBtn.addEventListener('click', function () {
